@@ -189,7 +189,7 @@ impl<'a> CRC<'a, u32> {
         // Endianness is related to the "reflection" parameter.
         let table = build_table_32(&configuration);
 
-        let crc = CRC::<u32>::reset(&configuration);
+        let crc = CRC::<u32>::init(&configuration);
 
         CRC {
             configuration,
@@ -198,15 +198,38 @@ impl<'a> CRC<'a, u32> {
         }
     }
 
-    /// Reset the CRC to the initial state
-    /// Returns the CRC value
-    /// It's not very RAII
-    fn reset(configuration: &CRCConfiguration<'a, u32>) -> u32 {
+    /// Initiallize the CRC with the initial values
+    pub fn init(configuration: &CRCConfiguration<'a, u32>) -> u32 {
         match configuration.endianness {
             CRCEndianness::LSB => {
                 configuration.initial.reverse_bits() >> (32u8 - (configuration.width as u8))
             }
             CRCEndianness::MSB => configuration.initial << (32u8 - (configuration.width as u8)),
+        }
+    }
+
+    /// Get the current state of the CRC
+    pub fn state(&self) -> u32 {
+        self.crc
+    }
+
+    /// "Finalize" the CRC value
+    /// For a rolling checksum, this calculates the final transforms,
+    /// Such as reflecting the output and XORing the output
+    pub fn finalize(&mut self) -> u32 {
+        if let CRCEndianness::MSB = self.configuration.endianness {
+            if self.configuration.reflect_out {
+                self.crc = self.crc.reverse_bits();
+            }
+        }
+        if !self.configuration.reflect_out {
+            self.crc >>= 32u8 - (self.configuration.width as u8);
+        }
+
+        if let Some(xor_out) = self.configuration.xor_out {
+            self.crc ^ xor_out
+        } else {
+            self.crc
         }
     }
 }
@@ -220,7 +243,7 @@ impl<'a> CRC<'a, u16> {
         // Endianness is related to the "reflection" parameter.
         let table = build_table_16(&configuration);
 
-        let crc = CRC::<u16>::reset(&configuration);
+        let crc = CRC::<u16>::init(&configuration);
 
         CRC {
             configuration,
@@ -231,13 +254,37 @@ impl<'a> CRC<'a, u16> {
 
     /// Reset the CRC to the initial state
     /// Returns the CRC value
-    /// It's not very RAII
-    fn reset(configuration: &CRCConfiguration<'a, u16>) -> u16 {
+    fn init(configuration: &CRCConfiguration<'a, u16>) -> u16 {
         match configuration.endianness {
             CRCEndianness::LSB => {
                 configuration.initial.reverse_bits() >> (16u8 - (configuration.width as u8))
             }
             CRCEndianness::MSB => configuration.initial << (16u8 - (configuration.width as u8)),
+        }
+    }
+
+    /// Get the current state of the CRC
+    pub fn state(&self) -> u16 {
+        self.crc
+    }
+
+    /// "Finalize" the CRC value
+    /// For a rolling checksum, this calculates the final transforms,
+    /// Such as reflecting the output and XORing the output
+    pub fn finalize(&mut self) -> u16 {
+        if let CRCEndianness::MSB = self.configuration.endianness {
+            if self.configuration.reflect_out {
+                self.crc = self.crc.reverse_bits();
+            }
+        }
+        if !self.configuration.reflect_out {
+            self.crc >>= 16u8 - (self.configuration.width as u8);
+        }
+
+        if let Some(xor_out) = self.configuration.xor_out {
+            self.crc ^ xor_out
+        } else {
+            self.crc
         }
     }
 }
@@ -278,26 +325,13 @@ impl<'a> Default for CRC<'a, u16> {
 
 impl<'a> Checksum<u32> for CRC<'a, u32> {
     fn compute(&mut self, data: &[u8]) -> u32 {
-        self.crc = CRC::<u32>::reset(&self.configuration);
+        self.crc = CRC::<u32>::init(&self.configuration);
 
         for byte in data {
             self.update(*byte);
         }
 
-        if let CRCEndianness::MSB = self.configuration.endianness {
-            if self.configuration.reflect_out {
-                self.crc = self.crc.reverse_bits();
-            }
-        }
-        if !self.configuration.reflect_out {
-            self.crc >>= 32u8 - (self.configuration.width as u8);
-        }
-
-        if let Some(xor_out) = self.configuration.xor_out {
-            self.crc ^ xor_out
-        } else {
-            self.crc
-        }
+        self.finalize()
     }
 
     fn update(&mut self, data: u8) -> u32 {
@@ -315,30 +349,23 @@ impl<'a> Checksum<u32> for CRC<'a, u32> {
 
         self.crc
     }
+
+    /// Reset the CRC to the initial state
+    /// Returns the CRC value
+    fn reset(&mut self) {
+        self.crc = CRC::<u32>::init(&self.configuration);
+    }
 }
 
 impl<'a> Checksum<u16> for CRC<'a, u16> {
     fn compute(&mut self, data: &[u8]) -> u16 {
-        self.crc = CRC::<u16>::reset(&self.configuration);
+        self.crc = CRC::<u16>::init(&self.configuration);
 
         for byte in data {
             self.update(*byte);
         }
 
-        if let CRCEndianness::MSB = self.configuration.endianness {
-            if self.configuration.reflect_out {
-                self.crc = self.crc.reverse_bits();
-            }
-        }
-        if !self.configuration.reflect_out {
-            self.crc >>= 16u8 - (self.configuration.width as u8);
-        }
-
-        if let Some(xor_out) = self.configuration.xor_out {
-            self.crc ^ xor_out
-        } else {
-            self.crc
-        }
+        self.finalize()
     }
 
     fn update(&mut self, data: u8) -> u16 {
@@ -355,6 +382,14 @@ impl<'a> Checksum<u16> for CRC<'a, u16> {
         };
 
         self.crc
+    }
+
+    /// Reset the CRC to the initial state
+    /// Returns the CRC value
+    /// It's not very RAII
+    /// TODO: Fix this up
+    fn reset(&mut self) {
+        self.crc = CRC::<u16>::init(&self.configuration);
     }
 }
 
@@ -453,7 +488,7 @@ mod tests {
         let data = string.as_bytes();
 
         let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
-            "CRC-32/MPEG-2",
+            "CRC-32/BZIP2",
             BitWidth::ThirtyTwo,
             CRCEndianness::MSB,
             0x04C11DB7,
@@ -550,6 +585,122 @@ mod tests {
         assert_eq!(result, expected);
 
         let result = crc.compute(&data);
+        assert_eq!(result, expected);
+    }
+
+    /// Test calling reset with a default constructor works for a CRC-32
+    #[test]
+    fn reset_crc_32_with_default_works() {
+        let expected: u32 = 0x0376E6E7;
+        let string = "123456789";
+        let data = string.as_bytes();
+
+        let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
+            "CRC-32/MPEG-2",
+            BitWidth::ThirtyTwo,
+            CRCEndianness::MSB,
+            0x04C11DB7,
+            false,
+            Some(0xFFFFFFFF),
+            None,
+        ));
+
+        let result = crc.compute(&data);
+        assert_eq!(result, expected);
+
+        crc.reset();
+        let result = crc.compute(&data);
+        assert_eq!(result, expected);
+    }
+
+    /// Test reset for with a default constructor works for a CRC-16
+    #[test]
+    fn reset_crc_16_with_default_works() {
+        let expected: u16 = 0x2189;
+        let string = "123456789";
+        let data = string.as_bytes();
+
+        let mut crc = CRC::<u16>::new(CRCConfiguration::<u16>::new(
+            "CRC-16/KERMIT",
+            BitWidth::Sixteen,
+            CRCEndianness::LSB,
+            0x1021,
+            true,
+            None,
+            None,
+        ));
+
+        let result = crc.compute(&data);
+        assert_eq!(result, expected);
+
+        crc.reset();
+        let result = crc.compute(&data);
+        assert_eq!(result, expected);
+    }
+
+    /// Test calling reset with a default constructor works for a CRC-32
+    /// Use case of rolling update
+    #[test]
+    fn reset_crc_32_with_default_update_works() {
+        let expected: u32 = 0x0376E6E7;
+        let string = "123456789";
+        let data = string.as_bytes();
+
+        let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
+            "CRC-32/MPEG-2",
+            BitWidth::ThirtyTwo,
+            CRCEndianness::MSB,
+            0x04C11DB7,
+            false,
+            Some(0xFFFFFFFF),
+            None,
+        ));
+
+        let mut result: u32;
+        for byte in data {
+            crc.update(*byte);
+        }
+        result = crc.finalize();
+        assert_eq!(result, expected);
+
+        crc.reset();
+        for byte in data {
+            crc.update(*byte);
+        }
+        result = crc.finalize();
+        assert_eq!(result, expected);
+    }
+
+    /// Test reset for with a default constructor works for a CRC-16
+    /// Use case of rolling update
+    #[test]
+    fn reset_crc_16_with_default_update_works() {
+        let expected: u16 = 0x2189;
+        let string = "123456789";
+        let data = string.as_bytes();
+
+        let mut crc = CRC::<u16>::new(CRCConfiguration::<u16>::new(
+            "CRC-16/KERMIT",
+            BitWidth::Sixteen,
+            CRCEndianness::LSB,
+            0x1021,
+            true,
+            None,
+            None,
+        ));
+
+        let mut result: u16;
+        for byte in data {
+            crc.update(*byte);
+        }
+        result = crc.finalize();
+        assert_eq!(result, expected);
+
+        crc.reset();
+        for byte in data {
+            crc.update(*byte);
+        }
+        result = crc.finalize();
         assert_eq!(result, expected);
     }
 }

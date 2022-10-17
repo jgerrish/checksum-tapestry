@@ -49,6 +49,17 @@ coverage, the test sources have not been checked themselves.
 This crate can provide a good basis to build a test-driven checksum
 library, but it should not be considered authoritative.
 
+# Examples
+
+This crate also provides some examples showing how to use the
+checksums and different parameters of each.
+
+
+A visualization of the weaknesses of Adler-32 on short messages:
+
+$ cargo run --example adler32_output_space_use
+
+
 # References
 
 [crc_v3.txt](http://ross.net/crc/download/crc_v3.txt "A Painless Guide to CRC Error Detection Algorithms")

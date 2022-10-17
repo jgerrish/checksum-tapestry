@@ -67,4 +67,13 @@ pub trait Checksum<T> {
     /// assert_eq!(result, expected2);
     /// ```
     fn update(&mut self, data: u8) -> T;
+
+    /// Reset the checksum to the original state.
+    /// This resets the checksum to the state it was in when it was
+    /// created.
+    /// If it was created with non-default parameters, those should be
+    /// preserved.
+    /// If an initial value was specified when originally creating the checksum,
+    /// it should be preserved and initialized to that value.
+    fn reset(&mut self);
 }

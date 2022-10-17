@@ -22,7 +22,9 @@ use crate::Checksum;
 pub struct Adler32 {
     /// The modulus value to use for computing the checksum
     pub mod_adler: u32,
-
+    /// Initial value of the checksum.
+    /// This is saved so we can reset the checksum.
+    initial: u32,
     /// Adler-32 checksum state
     a: u32,
     /// Adler-32 checksum state
@@ -63,6 +65,7 @@ impl Adler32 {
     pub fn new(mod_adler: u32, initial: u32) -> Adler32 {
         Adler32 {
             mod_adler,
+            initial,
             a: initial & 0xFFFF,
             b: initial >> 16,
         }
@@ -73,6 +76,7 @@ impl Default for Adler32 {
     fn default() -> Adler32 {
         Adler32 {
             mod_adler: 65521,
+            initial: 0x00000001,
             a: 1,
             b: 0,
         }
@@ -111,6 +115,12 @@ impl Checksum<u32> for Adler32 {
         self.b = (self.b + self.a) % self.mod_adler;
 
         (self.b << 16) | self.a
+    }
+
+    /// Reset the CRC
+    fn reset(&mut self) {
+        self.a = self.initial & 0xFFFF;
+        self.b = self.initial >> 16;
     }
 }
 
@@ -222,6 +232,46 @@ mod tests {
         let data = string.as_bytes();
 
         let mut adler32 = Adler32::new(65521, 0x12345678);
+        let result = adler32.compute(data);
+
+        assert_eq!(result, expected);
+    }
+
+    /// Test reset with a checksum created with default values
+    #[test]
+    fn test_reset_with_default() {
+        let expected: u32 = 0x91e01de;
+        let string = "123456789";
+        let data = string.as_bytes();
+
+        let mut adler32 = Adler32::default();
+
+        let result = adler32.compute(data);
+        assert_eq!(result, expected);
+
+        // Test after resetting
+        adler32.reset();
+        let result = adler32.compute(data);
+
+        assert_eq!(result, expected);
+    }
+
+    /// Test reset with a checksum created with new with a 32-bit
+    /// initial value
+    #[test]
+    fn test_reset_with_new_with_32_bit() {
+        let expected: u32 = 0x25AE5855;
+
+        let string = "123456789";
+        let data = string.as_bytes();
+
+        let mut adler32 = Adler32::new(65521, 0x12345678);
+        let result = adler32.compute(data);
+
+        assert_eq!(result, expected);
+
+        // Test after resetting
+        adler32.reset();
         let result = adler32.compute(data);
 
         assert_eq!(result, expected);

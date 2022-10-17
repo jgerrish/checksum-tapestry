@@ -54,6 +54,11 @@ impl Checksum<u16> for Fletcher16 {
 
         ((self.c1 as u16) << 8) | (self.c0 as u16)
     }
+
+    fn reset(&mut self) {
+        self.c0 = 0;
+        self.c1 = 0;
+    }
 }
 
 #[cfg(test)]
@@ -121,6 +126,21 @@ mod tests {
 
         let result: u16 = fletcher.compute(&data).try_into().unwrap();
 
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn fletcher16_reset_with_default_works() {
+        let expected: u16 = 0xC8F0;
+        let string = "abcde";
+        let data = string.as_bytes();
+        let mut fletcher = Fletcher16::default();
+
+        let result: u16 = fletcher.compute(data).try_into().unwrap();
+        assert_eq!(result, expected);
+
+        fletcher.reset();
+        let result: u16 = fletcher.compute(data).try_into().unwrap();
         assert_eq!(result, expected);
     }
 }
