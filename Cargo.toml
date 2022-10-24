@@ -8,6 +8,7 @@ keywords = ["checksum", "adler32", "algorithm", "crc", "fletcher16"]
 readme = "README.md"
 repository = "https://github.com/jgerrish/checksum-tapestry"
 homepage = "https://github.com/jgerrish/checksum-tapestry"
+license = "MIT"
 
 [features]
 experiments = ["dep:rand"]
