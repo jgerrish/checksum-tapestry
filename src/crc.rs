@@ -16,7 +16,7 @@
 //!     true,
 //!     Some(0xFFFFFFFF),
 //!     Some(0xFFFFFFFF),
-//! ));
+//! ), true);
 //!
 //! let result: u32 = crc32.compute(&data);
 //! assert_eq!(result, expected);
@@ -27,7 +27,7 @@
 use core::default::Default;
 
 use crate::{
-    crc_table::{build_table_16, build_table_32},
+    crc_table::{build_table_16, build_table_32, crc16, crc32},
     Checksum,
 };
 
@@ -43,7 +43,7 @@ impl Width for u32 {}
 pub struct CRC<'a, BITWIDTH: Width> {
     configuration: CRCConfiguration<'a, BITWIDTH>,
     /// The pre-computed values to speeed up computing the CRC
-    pub table: [BITWIDTH; 256],
+    pub table: Option<[BITWIDTH; 256]>,
 
     /// state of the CRC for rolling checksums
     crc: BITWIDTH,
@@ -182,12 +182,37 @@ pub enum CRCEndianness {
 
 impl<'a> CRC<'a, u32> {
     /// Create a new CRC
+    /// If build_table is true, precompute a table to speed up multiple runs
+    /// of the CRC.
+    /// If build_table is false, don't build a table.
+    /// This is useful on memory-constrained systems.
+    ///
+    /// # Examples
+    /// ```
+    /// use checksum_tapestry::crc::{BitWidth, CRCConfiguration, CRCEndianness, CRC};
+    /// use checksum_tapestry::Checksum;
+    /// let expected: u32 = 0xCBF43926;
+    /// let string = "123456789";
+    /// let data = string.as_bytes();
+    /// let crc32 = CRC::<u32>::new(CRCConfiguration::<u32>::new(
+    ///     "CRC-32/ISO-HDLC",
+    ///     BitWidth::ThirtyTwo,
+    ///     CRCEndianness::LSB,
+    ///     0x04C11DB7,
+    ///     true,
+    ///     Some(0xFFFFFFFF),
+    ///     Some(0xFFFFFFFF),
+    /// ), true);
+    ///
+    /// assert!(crc32.table.is_some());
+    /// ```
     #[allow(dead_code)]
-    pub fn new(configuration: CRCConfiguration<'a, u32>) -> Self {
-        // Work through how the CRC works, whether we need to incorporate
-        // endianness into both the table generation and the computation
-        // Endianness is related to the "reflection" parameter.
-        let table = build_table_32(&configuration);
+    pub fn new(configuration: CRCConfiguration<'a, u32>, build_table: bool) -> Self {
+        let table = if build_table {
+            Some(build_table_32(&configuration))
+        } else {
+            None
+        };
 
         let crc = CRC::<u32>::init(&configuration);
 
@@ -236,12 +261,42 @@ impl<'a> CRC<'a, u32> {
 
 impl<'a> CRC<'a, u16> {
     /// Create a new CRC
+    /// If build_table is true, precompute a table to speed up multiple runs
+    /// of the CRC.
+    /// If build_table is false, don't build a table.
+    /// This is useful on memory-constrained systems.
+    ///
+    /// # Examples
+    /// ```
+    /// use checksum_tapestry::crc::{BitWidth, CRCConfiguration, CRCEndianness, CRC};
+    /// use checksum_tapestry::Checksum;
+    /// let expected: u16 = 0x2189;
+    /// let string = "123456789";
+    /// let data = string.as_bytes();
+    /// let crc = CRC::<u16>::new(
+    ///     CRCConfiguration::<u16>::new(
+    ///         "CRC-16/KERMIT",
+    ///         BitWidth::Sixteen,
+    ///         CRCEndianness::LSB,
+    ///         0x1021,
+    ///         true,
+    ///         None,
+    ///         None,
+    ///     ),
+    ///     false,
+    /// );
+    /// assert!(crc.table.is_none());
+    /// ```
     #[allow(dead_code)]
-    pub fn new(configuration: CRCConfiguration<'a, u16>) -> Self {
+    pub fn new(configuration: CRCConfiguration<'a, u16>, build_table: bool) -> Self {
         // Work through how the CRC works, whether we need to incorporate
         // endianness into both the table generation and the computation
         // Endianness is related to the "reflection" parameter.
-        let table = build_table_16(&configuration);
+        let table = if build_table {
+            Some(build_table_16(&configuration))
+        } else {
+            None
+        };
 
         let crc = CRC::<u16>::init(&configuration);
 
@@ -302,7 +357,7 @@ impl<'a> Default for CRC<'a, u32> {
             None,
         );
 
-        CRC::<u32>::new(configuration)
+        CRC::<u32>::new(configuration, true)
     }
 }
 
@@ -319,7 +374,7 @@ impl<'a> Default for CRC<'a, u16> {
             None,
         );
 
-        CRC::<u16>::new(configuration)
+        CRC::<u16>::new(configuration, true)
     }
 }
 
@@ -339,11 +394,21 @@ impl<'a> Checksum<u32> for CRC<'a, u32> {
         self.crc = match self.configuration.endianness {
             CRCEndianness::LSB => {
                 let index: u32 = (self.crc ^ (data as u32)) & 0xFF;
-                (self.crc >> 8) ^ self.table[index as usize]
+                let val = if let Some(table) = self.table {
+                    table[index as usize]
+                } else {
+                    crc32(&self.configuration, index)
+                };
+                (self.crc >> 8) ^ val
             }
             CRCEndianness::MSB => {
                 let index: u32 = ((self.crc >> 24) ^ (data as u32)) & 0xFF;
-                (self.crc << 8) ^ self.table[index as usize]
+                let val = if let Some(table) = self.table {
+                    table[index as usize]
+                } else {
+                    crc32(&self.configuration, index)
+                };
+                (self.crc << 8) ^ val
             }
         };
 
@@ -368,16 +433,30 @@ impl<'a> Checksum<u16> for CRC<'a, u16> {
         self.finalize()
     }
 
+    // TODO: Optimize for table vs. non-table versions.  Instead of
+    // checking every update, have ::new create a version without a
+    // check.
     fn update(&mut self, data: u8) -> u16 {
         // table is an array of 256 16-bit constants
+
         self.crc = match self.configuration.endianness {
             CRCEndianness::LSB => {
                 let index = (self.crc ^ (data as u16)) & 0xFF;
-                (self.crc >> 8) ^ self.table[index as usize]
+                let val = if let Some(table) = self.table {
+                    table[index as usize]
+                } else {
+                    crc16(&self.configuration, index)
+                };
+                (self.crc >> 8) ^ val
             }
             CRCEndianness::MSB => {
                 let index = ((self.crc >> 8) ^ (data as u16)) & 0xFF;
-                (self.crc << 8) ^ self.table[index as usize]
+                let val = if let Some(table) = self.table {
+                    table[index as usize]
+                } else {
+                    crc16(&self.configuration, index)
+                };
+                (self.crc << 8) ^ val
             }
         };
 
@@ -403,15 +482,18 @@ mod tests {
     fn crc_3_gsm_works() {
         let string = "123456789";
         let data = string.as_bytes();
-        let mut crc3 = CRC::<u16>::new(CRCConfiguration::<u16>::new(
-            "CRC-3/GSM",
-            BitWidth::Three,
-            CRCEndianness::MSB,
-            0b011,
-            false,
-            None,
-            Some(0b111),
-        ));
+        let mut crc3 = CRC::<u16>::new(
+            CRCConfiguration::<u16>::new(
+                "CRC-3/GSM",
+                BitWidth::Three,
+                CRCEndianness::MSB,
+                0b011,
+                false,
+                None,
+                Some(0b111),
+            ),
+            true,
+        );
         let expected: u16 = 0x4;
 
         let result = crc3.compute(&data);
@@ -425,15 +507,18 @@ mod tests {
         let expected: u32 = 0xCBF43926;
         let string = "123456789";
         let data = string.as_bytes();
-        let mut crc32 = CRC::<u32>::new(CRCConfiguration::<u32>::new(
-            "CRC-32/ISO-HDLC",
-            BitWidth::ThirtyTwo,
-            CRCEndianness::LSB,
-            0x04C11DB7,
+        let mut crc32 = CRC::<u32>::new(
+            CRCConfiguration::<u32>::new(
+                "CRC-32/ISO-HDLC",
+                BitWidth::ThirtyTwo,
+                CRCEndianness::LSB,
+                0x04C11DB7,
+                true,
+                Some(0xFFFFFFFF),
+                Some(0xFFFFFFFF),
+            ),
             true,
-            Some(0xFFFFFFFF),
-            Some(0xFFFFFFFF),
-        ));
+        );
 
         let result: u32 = crc32.compute(&data);
         assert_eq!(result, expected);
@@ -445,15 +530,18 @@ mod tests {
         let expected: u16 = 0xD64E;
         let string = "123456789";
         let data = string.as_bytes();
-        let mut crc = CRC::<u16>::new(CRCConfiguration::<u16>::new(
-            "CRC-32/Genibus",
-            BitWidth::Sixteen,
-            CRCEndianness::MSB,
-            0x1021,
-            false,
-            Some(0xFFFF),
-            Some(0xFFFF),
-        ));
+        let mut crc = CRC::<u16>::new(
+            CRCConfiguration::<u16>::new(
+                "CRC-32/Genibus",
+                BitWidth::Sixteen,
+                CRCEndianness::MSB,
+                0x1021,
+                false,
+                Some(0xFFFF),
+                Some(0xFFFF),
+            ),
+            true,
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -466,15 +554,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u16>::new(CRCConfiguration::<u16>::new(
-            "CRC-12/UMTS",
-            BitWidth::Twelve,
-            CRCEndianness::MSB,
-            0x80F,
+        let mut crc = CRC::<u16>::new(
+            CRCConfiguration::<u16>::new(
+                "CRC-12/UMTS",
+                BitWidth::Twelve,
+                CRCEndianness::MSB,
+                0x80F,
+                true,
+                None,
+                None,
+            ),
             true,
-            None,
-            None,
-        ));
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -487,15 +578,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
-            "CRC-32/BZIP2",
-            BitWidth::ThirtyTwo,
-            CRCEndianness::MSB,
-            0x04C11DB7,
-            false,
-            Some(0xFFFFFFFF),
-            Some(0xFFFFFFFF),
-        ));
+        let mut crc = CRC::<u32>::new(
+            CRCConfiguration::<u32>::new(
+                "CRC-32/BZIP2",
+                BitWidth::ThirtyTwo,
+                CRCEndianness::MSB,
+                0x04C11DB7,
+                false,
+                Some(0xFFFFFFFF),
+                Some(0xFFFFFFFF),
+            ),
+            true,
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -508,15 +602,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
-            "CRC-32/MPEG-2",
-            BitWidth::ThirtyTwo,
-            CRCEndianness::MSB,
-            0x04C11DB7,
-            false,
-            Some(0xFFFFFFFF),
-            None,
-        ));
+        let mut crc = CRC::<u32>::new(
+            CRCConfiguration::<u32>::new(
+                "CRC-32/MPEG-2",
+                BitWidth::ThirtyTwo,
+                CRCEndianness::MSB,
+                0x04C11DB7,
+                false,
+                Some(0xFFFFFFFF),
+                None,
+            ),
+            true,
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -529,15 +626,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u16>::new(CRCConfiguration::<u16>::new(
-            "CRC-16/KERMIT",
-            BitWidth::Sixteen,
-            CRCEndianness::LSB,
-            0x1021,
+        let mut crc = CRC::<u16>::new(
+            CRCConfiguration::<u16>::new(
+                "CRC-16/KERMIT",
+                BitWidth::Sixteen,
+                CRCEndianness::LSB,
+                0x1021,
+                true,
+                None,
+                None,
+            ),
             true,
-            None,
-            None,
-        ));
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -550,15 +650,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
-            "CRC-32/iSCSI",
-            BitWidth::ThirtyTwo,
-            CRCEndianness::LSB,
-            0x1EDC6F41,
+        let mut crc = CRC::<u32>::new(
+            CRCConfiguration::<u32>::new(
+                "CRC-32/iSCSI",
+                BitWidth::ThirtyTwo,
+                CRCEndianness::LSB,
+                0x1EDC6F41,
+                true,
+                Some(0xFFFFFFFF),
+                Some(0xFFFFFFFF),
+            ),
             true,
-            Some(0xFFFFFFFF),
-            Some(0xFFFFFFFF),
-        ));
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -571,15 +674,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
-            "CRC-32/MPEG-2",
-            BitWidth::ThirtyTwo,
-            CRCEndianness::MSB,
-            0x04C11DB7,
-            false,
-            Some(0xFFFFFFFF),
-            None,
-        ));
+        let mut crc = CRC::<u32>::new(
+            CRCConfiguration::<u32>::new(
+                "CRC-32/MPEG-2",
+                BitWidth::ThirtyTwo,
+                CRCEndianness::MSB,
+                0x04C11DB7,
+                false,
+                Some(0xFFFFFFFF),
+                None,
+            ),
+            true,
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -595,15 +701,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
-            "CRC-32/MPEG-2",
-            BitWidth::ThirtyTwo,
-            CRCEndianness::MSB,
-            0x04C11DB7,
-            false,
-            Some(0xFFFFFFFF),
-            None,
-        ));
+        let mut crc = CRC::<u32>::new(
+            CRCConfiguration::<u32>::new(
+                "CRC-32/MPEG-2",
+                BitWidth::ThirtyTwo,
+                CRCEndianness::MSB,
+                0x04C11DB7,
+                false,
+                Some(0xFFFFFFFF),
+                None,
+            ),
+            true,
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -620,15 +729,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u16>::new(CRCConfiguration::<u16>::new(
-            "CRC-16/KERMIT",
-            BitWidth::Sixteen,
-            CRCEndianness::LSB,
-            0x1021,
+        let mut crc = CRC::<u16>::new(
+            CRCConfiguration::<u16>::new(
+                "CRC-16/KERMIT",
+                BitWidth::Sixteen,
+                CRCEndianness::LSB,
+                0x1021,
+                true,
+                None,
+                None,
+            ),
             true,
-            None,
-            None,
-        ));
+        );
 
         let result = crc.compute(&data);
         assert_eq!(result, expected);
@@ -646,15 +758,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u32>::new(CRCConfiguration::<u32>::new(
-            "CRC-32/MPEG-2",
-            BitWidth::ThirtyTwo,
-            CRCEndianness::MSB,
-            0x04C11DB7,
-            false,
-            Some(0xFFFFFFFF),
-            None,
-        ));
+        let mut crc = CRC::<u32>::new(
+            CRCConfiguration::<u32>::new(
+                "CRC-32/MPEG-2",
+                BitWidth::ThirtyTwo,
+                CRCEndianness::MSB,
+                0x04C11DB7,
+                false,
+                Some(0xFFFFFFFF),
+                None,
+            ),
+            true,
+        );
 
         let mut result: u32;
         for byte in data {
@@ -679,15 +794,18 @@ mod tests {
         let string = "123456789";
         let data = string.as_bytes();
 
-        let mut crc = CRC::<u16>::new(CRCConfiguration::<u16>::new(
-            "CRC-16/KERMIT",
-            BitWidth::Sixteen,
-            CRCEndianness::LSB,
-            0x1021,
+        let mut crc = CRC::<u16>::new(
+            CRCConfiguration::<u16>::new(
+                "CRC-16/KERMIT",
+                BitWidth::Sixteen,
+                CRCEndianness::LSB,
+                0x1021,
+                true,
+                None,
+                None,
+            ),
             true,
-            None,
-            None,
-        ));
+        );
 
         let mut result: u16;
         for byte in data {
@@ -701,6 +819,56 @@ mod tests {
             crc.update(*byte);
         }
         result = crc.finalize();
+        assert_eq!(result, expected);
+    }
+
+    /// Test building a CRC without table optimizations
+    /// Test CRC-32/MPEG-2
+    #[test]
+    fn crc_32_mpeg2_no_table_works() {
+        let expected: u32 = 0x0376E6E7;
+        let string = "123456789";
+        let data = string.as_bytes();
+
+        let mut crc = CRC::<u32>::new(
+            CRCConfiguration::<u32>::new(
+                "CRC-32/MPEG-2",
+                BitWidth::ThirtyTwo,
+                CRCEndianness::MSB,
+                0x04C11DB7,
+                false,
+                Some(0xFFFFFFFF),
+                None,
+            ),
+            false,
+        );
+
+        let result = crc.compute(&data);
+        assert_eq!(result, expected);
+    }
+
+    /// Test building a CRC without table optimizations
+    /// Test CRC-16/KERMIT
+    #[test]
+    fn crc_16_kermit_no_table_works() {
+        let expected: u16 = 0x2189;
+        let string = "123456789";
+        let data = string.as_bytes();
+
+        let mut crc = CRC::<u16>::new(
+            CRCConfiguration::<u16>::new(
+                "CRC-16/KERMIT",
+                BitWidth::Sixteen,
+                CRCEndianness::LSB,
+                0x1021,
+                true,
+                None,
+                None,
+            ),
+            false,
+        );
+
+        let result = crc.compute(&data);
         assert_eq!(result, expected);
     }
 }
