@@ -1,22 +1,22 @@
 //! Example of using the Adler-32 checksum and a simple visualization
 //! of it's weaknesses with small message sizes.
+//! This doesn't show there are weaknesses with any degree of certainty,
+//! it only shows a rough visualization.
+//! Further statistical tests would need to be run to show that.
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use checksum_tapestry::adler32::Adler32;
 use checksum_tapestry::crc::{BitWidth, CRCConfiguration, CRCEndianness, CRC};
 use checksum_tapestry::Checksum;
 
-#[cfg(features = "experiments")]
-use rand::{rngs::OsRng, RngCore};
-
 const NUM_EXPERIMENTS: u32 = 1000;
 const NUM_BINS: u8 = 10;
 const MESSAGE_SIZE: usize = 50;
 
 /// Use the CRC code as a crude PRNG
-/// It's not secure, but it works for the purposes here as an example
-/// If you want a more tested PRNG library, enable the experiments feature with:
-/// cargo run --example adler32_output_space_use --features experiments
+/// It's not secure, but it works for the purposes here as an example.
+/// If you want to substitute another algorithm, feel free to and
+/// enjoy hacking!
 fn prng(state: &mut CRC<u32>) -> u32 {
     state.update((state.state() >> 24) as u8)
 }
@@ -34,9 +34,6 @@ fn run_experiment(
     // Run the experiments
     for i in 0..NUM_EXPERIMENTS {
         // Generate a random message string
-        #[cfg(features = "experiments")]
-        OsRng.try_fill_bytes(&mut random_buffer).unwrap();
-        #[cfg(not(features = "experiments"))]
         let mut last: u32;
         for item in &mut random_buffer {
             last = prng(prng_crc);

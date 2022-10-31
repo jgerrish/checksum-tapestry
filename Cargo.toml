@@ -1,6 +1,6 @@
 [package]
 name = "checksum-tapestry"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Joshua Gerrish <jgerrish@gmail.com>"]
 description = "Collection of checksum algorithms and examples"
@@ -9,9 +9,3 @@ readme = "README.md"
 repository = "https://github.com/jgerrish/checksum-tapestry"
 homepage = "https://github.com/jgerrish/checksum-tapestry"
 license = "MIT"
-
-[features]
-experiments = ["dep:rand"]
-
-[dependencies]
-rand = { version = "0.8", optional = true }
