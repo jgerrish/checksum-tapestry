@@ -112,7 +112,8 @@ impl<'a> CRCConfiguration<'a, u16> {
         initial: Option<u16>,
         xor_out: Option<u16>,
     ) -> CRCConfiguration<u16> {
-        let initial = if let Some(i) = initial { i } else { 0x0000 };
+        // Default value for integer types is zero
+        let initial = initial.unwrap_or_default();
 
         CRCConfiguration {
             name,
@@ -138,7 +139,8 @@ impl CRCConfiguration<'_, u32> {
         initial: Option<u32>,
         xor_out: Option<u32>,
     ) -> CRCConfiguration<u32> {
-        let initial = if let Some(i) = initial { i } else { 0x00000000 };
+        // Default value for integer types is zero
+        let initial = initial.unwrap_or_default();
 
         CRCConfiguration {
             name,

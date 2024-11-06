@@ -45,14 +45,14 @@ impl Checksum<u16> for Fletcher16 {
             self.update(*byte);
         }
 
-        ((self.c1 as u16) << 8) | (self.c0 as u16)
+        (self.c1 << 8) | self.c0
     }
 
     fn update(&mut self, data: u8) -> u16 {
         self.c0 = (self.c0 + (data as u16)) % (self.modulus as u16);
         self.c1 = (self.c1 + self.c0) % (self.modulus as u16);
 
-        ((self.c1 as u16) << 8) | (self.c0 as u16)
+        (self.c1 << 8) | self.c0
     }
 
     fn reset(&mut self) {
