@@ -109,7 +109,7 @@ impl Checksum<u32> for Adler32 {
 
     /// From Wikipedia
     /// The formula used is:
-    /// A = 1 + data[0] + data[1] + ... + data[n] (mod 65521)
+    /// `A = 1 + data[0] + data[1] + ... + data[n] (mod 65521)`
     fn update(&mut self, data: u8) -> u32 {
         self.a = (self.a + (data as u32)) % self.mod_adler;
         self.b = (self.b + self.a) % self.mod_adler;

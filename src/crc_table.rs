@@ -116,17 +116,17 @@ pub const fn crc32(configuration: &CRCConfiguration<u32>, mut value: u32) -> u32
 /// that require unmatched reflect_in and reflect_out settings.
 /// The real-world is messy.
 /// These are simpler to understand than optimized table generation
-/// routines that make use of the fact that table[i xor j] == table[i]
-/// xor table[j], so that we only have to update entries corresponding
-/// to powers of two.
+/// routines that make use of the fact that `table[i xor j] ==
+/// table[i] xor table[j]`, so that we only have to update entries
+/// corresponding to powers of two.
 ///
 /// This is based on the Sarwate method, outlined in Sarwate, Dilip
 /// V. (August 1998). "Computation of Cyclic Redundancy Checks via
 /// Table Look-Up". Communications of the ACM. 31 (8):
 /// 1008–1013. doi:10.1145/63030.63037. S2CID 5363350.
 ///
-/// The tutorial at
-/// https://github.com/komrad36/CRC/blob/master/README.md by komrad36
+/// The tutorial
+/// [CRC README.md by komrad36](https://github.com/komrad36/CRC/blob/master/README.md)
 /// provides a very good overview of why this works.
 ///
 /// # Examples
@@ -168,17 +168,17 @@ pub fn build_table_16(configuration: &CRCConfiguration<u16>) -> [u16; 256] {
 /// that require unmatched reflect_in and reflect_out settings.
 /// The real-world is messy.
 /// These are simpler to understand than optimized table generation
-/// routines that make use of the fact that table[i xor j] == table[i]
-/// xor table[j], so that we only have to update entries corresponding
-/// to powers of two.
+/// routines that make use of the fact that `table[i xor j] ==
+/// table[i] xor table[j]`, so that we only have to update entries
+/// corresponding to powers of two.
 ///
 /// This is based on the Sarwate method, outlined in Sarwate, Dilip
 /// V. (August 1998). "Computation of Cyclic Redundancy Checks via
 /// Table Look-Up". Communications of the ACM. 31 (8):
 /// 1008–1013. doi:10.1145/63030.63037. S2CID 5363350.
 ///
-/// The tutorial at
-/// https://github.com/komrad36/CRC/blob/master/README.md by komrad36
+/// The tutorial
+/// [CRC README.md by komrad36](https://github.com/komrad36/CRC/blob/master/README.md)
 /// provides a very good overview of why this works.
 ///
 /// # Examples
@@ -215,7 +215,7 @@ pub fn build_table_32(configuration: &CRCConfiguration<u32>) -> [u32; 256] {
 
 /// Build a CRC table for MSB 32-bit CRCs
 ///
-/// Make use of the fact that table[i xor j] == table[i] xor table[j],
+/// Make use of the fact that `table[i xor j] == table[i] xor table[j]`,
 /// we only have to update entries corresponding to powers of two
 pub fn optimized_build_msb_table_32(configuration: &CRCConfiguration<u32>) -> [u32; 256] {
     let mut table: [u32; 256] = [0; 256];
@@ -244,7 +244,7 @@ pub fn optimized_build_msb_table_32(configuration: &CRCConfiguration<u32>) -> [u
 
 /// Build a CRC table for LSB 32-bit CRCs
 ///
-/// Make use of the fact that table[i xor j] == table[i] xor table[j],
+/// Make use of the fact that `table[i xor j] == table[i] xor table[j]`,
 /// we only have to update entries corresponding to powers of two
 pub fn optimized_build_lsb_table_32(configuration: &CRCConfiguration<u32>) -> [u32; 256] {
     let mut table: [u32; 256] = [0; 256];
@@ -267,7 +267,7 @@ pub fn optimized_build_lsb_table_32(configuration: &CRCConfiguration<u32>) -> [u
 
 /// Build a CRC table for MSB 16-bit CRCs
 ///
-/// Make use of the fact that table[i xor j] == table[i] xor table[j],
+/// Make use of the fact that `table[i xor j] == table[i] xor table[j]`,
 /// we only have to update entries corresponding to powers of two
 pub fn optimized_build_msb_table_16(configuration: &CRCConfiguration<u16>) -> [u16; 256] {
     let mut table: [u16; 256] = [0; 256];
@@ -289,7 +289,7 @@ pub fn optimized_build_msb_table_16(configuration: &CRCConfiguration<u16>) -> [u
 
 /// Build a CRC table for LSB 16-bit CRCs
 ///
-/// Make use of the fact that table[i xor j] == table[i] xor table[j],
+/// Make use of the fact that `table[i xor j] == table[i] xor table[j]`,
 /// we only have to update entries corresponding to powers of two
 pub fn optimized_build_lsb_table_16(configuration: &CRCConfiguration<u16>) -> [u16; 256] {
     let mut table: [u16; 256] = [0; 256];
