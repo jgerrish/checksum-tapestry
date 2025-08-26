@@ -60,10 +60,10 @@ pub struct CRC<'a, BITWIDTH: Width> {
 /// Endianness is used in the same way as reflect in, but uses
 /// Rust-style enumerations.
 #[derive(Clone, Copy)]
-pub struct CRCConfiguration<'a, BITWIDTH: Width> {
+pub struct CRCConfiguration<'name, BITWIDTH: Width> {
     /// The common or standard name of this CRC32 configuration
     #[allow(dead_code)]
-    name: &'a str,
+    name: &'name str,
     /// The bit-width
     pub width: BitWidth,
 
@@ -100,18 +100,18 @@ pub struct CRCConfiguration<'a, BITWIDTH: Width> {
     xor_out: Option<BITWIDTH>,
 }
 
-impl<'a> CRCConfiguration<'a, u16> {
+impl<'name> CRCConfiguration<'name, u16> {
     /// Create a new CRC32Configuration
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        name: &'a str,
+        name: &'name str,
         width: BitWidth,
         endianness: CRCEndianness,
         poly: u16,
         reflect_out: bool,
         initial: Option<u16>,
         xor_out: Option<u16>,
-    ) -> CRCConfiguration<u16> {
+    ) -> CRCConfiguration<'name, u16> {
         // Default value for integer types is zero
         let initial = initial.unwrap_or_default();
 
@@ -127,18 +127,18 @@ impl<'a> CRCConfiguration<'a, u16> {
     }
 }
 
-impl CRCConfiguration<'_, u32> {
+impl<'name> CRCConfiguration<'name, u32> {
     /// Create a new CRC32Configuration
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        name: &str,
+        name: &'name str,
         width: BitWidth,
         endianness: CRCEndianness,
         poly: u32,
         reflect_out: bool,
         initial: Option<u32>,
         xor_out: Option<u32>,
-    ) -> CRCConfiguration<u32> {
+    ) -> CRCConfiguration<'name, u32> {
         // Default value for integer types is zero
         let initial = initial.unwrap_or_default();
 

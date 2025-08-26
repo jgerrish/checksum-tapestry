@@ -25,7 +25,7 @@ pub trait Checksum<T> {
     /// Compute a checksum over a u8 byte slice
     ///
     /// The Checksum API doesn't provide a finalize method.
-
+    ///
     /// Every call to compute resets the state of the CRC to an
     /// initial state.  So calling it twice with the same parameters
     /// should yield the same result.
