@@ -2,7 +2,7 @@
 //! These are different versions of CRC table generation code.
 //! This includes optimized and unoptimized versions.
 //! CRC generation code was based on the crc crate
-use crate::crc::{CRCConfiguration, CRCEndianness};
+use crate::crc::{BitOrder, CRCConfiguration};
 
 /// Compute a CRC using a 16-bit polynomial
 ///
@@ -12,14 +12,14 @@ use crate::crc::{CRCConfiguration, CRCEndianness};
 /// ```
 /// use checksum_tapestry::{
 ///     Checksum,
-///     crc::{BitWidth, CRCConfiguration, CRCEndianness},
+///     crc::{BitWidth, CRCConfiguration, BitOrder},
 ///     crc_table::crc16,
 /// };
 ///
 /// let configuration = CRCConfiguration::<u16>::new(
 ///     "CRC-16/CCITT",
 ///     BitWidth::Sixteen,
-///     CRCEndianness::MSB,
+///     BitOrder::MSBFirst,
 ///     0x1021,
 ///     true,
 ///     None,
@@ -31,15 +31,15 @@ use crate::crc::{CRCConfiguration, CRCEndianness};
 /// ```
 ///
 pub const fn crc16(configuration: &CRCConfiguration<u16>, mut value: u16) -> u16 {
-    let poly = match configuration.endianness {
-        CRCEndianness::MSB => configuration.poly << (16 - (configuration.width as u8)),
-        CRCEndianness::LSB => {
+    let poly = match configuration.bit_order {
+        BitOrder::MSBFirst => configuration.poly << (16 - (configuration.width as u8)),
+        BitOrder::LSBFirst => {
             let poly = configuration.poly.reverse_bits();
             poly >> (16 - (configuration.width as u8))
         }
     };
 
-    if let CRCEndianness::LSB = configuration.endianness {
+    if let BitOrder::LSBFirst = configuration.bit_order {
         let mut i = 0;
         while i < 8 {
             value = (value >> 1) ^ ((value & 1) * poly);
@@ -65,14 +65,14 @@ pub const fn crc16(configuration: &CRCConfiguration<u16>, mut value: u16) -> u16
 /// ```
 /// use checksum_tapestry::{
 ///     Checksum,
-///     crc::{BitWidth, CRCConfiguration, CRCEndianness},
+///     crc::{BitWidth, CRCConfiguration, BitOrder},
 ///     crc_table::crc32,
 /// };
 ///
 /// let configuration = CRCConfiguration::<u32>::new(
 ///     "CRC-32/MPEG-2",
 ///     BitWidth::ThirtyTwo,
-///     CRCEndianness::MSB,
+///     BitOrder::MSBFirst,
 ///     0x04C11DB7,
 ///     false,
 ///     Some(0xFFFFFFFF),
@@ -84,15 +84,15 @@ pub const fn crc16(configuration: &CRCConfiguration<u16>, mut value: u16) -> u16
 /// ```
 ///
 pub const fn crc32(configuration: &CRCConfiguration<u32>, mut value: u32) -> u32 {
-    let poly = match configuration.endianness {
-        CRCEndianness::MSB => configuration.poly << (32 - (configuration.width as u8)),
-        CRCEndianness::LSB => {
+    let poly = match configuration.bit_order {
+        BitOrder::MSBFirst => configuration.poly << (32 - (configuration.width as u8)),
+        BitOrder::LSBFirst => {
             let poly = configuration.poly.reverse_bits();
             poly >> (32 - (configuration.width as u8))
         }
     };
 
-    if let CRCEndianness::LSB = configuration.endianness {
+    if let BitOrder::LSBFirst = configuration.bit_order {
         let mut i = 0;
         while i < 8 {
             value = (value >> 1) ^ ((value & 1) * poly);
@@ -110,7 +110,7 @@ pub const fn crc32(configuration: &CRCConfiguration<u32>, mut value: u32) -> u32
     value
 }
 
-/// This builds the CRC based on the endianness, as opposed to the reflect_in
+/// This builds the CRC based on the bit order, as opposed to the reflect_in
 /// and reflect_out parameters.
 /// It supports most use-cases, but there are some CRCs, like CRC-16/Genibus
 /// that require unmatched reflect_in and reflect_out settings.
@@ -134,14 +134,14 @@ pub const fn crc32(configuration: &CRCConfiguration<u32>, mut value: u32) -> u32
 /// ```
 /// use checksum_tapestry::{
 ///     Checksum,
-///     crc::{BitWidth, CRCConfiguration, CRCEndianness},
+///     crc::{BitWidth, CRCConfiguration, BitOrder},
 ///     crc_table::build_table_16,
 /// };
 ///
 /// let configuration = CRCConfiguration::<u16>::new(
 ///     "CRC-16/KERMIT",
 ///     BitWidth::Sixteen,
-///     CRCEndianness::LSB,
+///     BitOrder::LSBFirst,
 ///     0x1021,
 ///     // true,
 ///     true,
@@ -162,7 +162,7 @@ pub fn build_table_16(configuration: &CRCConfiguration<u16>) -> [u16; 256] {
     table
 }
 
-/// This builds the CRC based on the endianness, as opposed to the reflect_in
+/// This builds the CRC based on the bit order, as opposed to the reflect_in
 /// and reflect_out parameters.
 /// It supports most use-cases, but there are some CRCs, like CRC-16/Genibus
 /// that require unmatched reflect_in and reflect_out settings.
@@ -186,14 +186,14 @@ pub fn build_table_16(configuration: &CRCConfiguration<u16>) -> [u16; 256] {
 /// ```
 /// use checksum_tapestry::{
 ///     Checksum,
-///     crc::{BitWidth, CRCConfiguration, CRCEndianness},
+///     crc::{BitWidth, CRCConfiguration, BitOrder},
 ///     crc_table::build_table_32,
 /// };
 ///
 /// let mut configuration = CRCConfiguration::<u32>::new(
 ///     "CRC-32/MPEG-2",
 ///     BitWidth::ThirtyTwo,
-///     CRCEndianness::MSB,
+///     BitOrder::MSBFirst,
 ///     0x04C11DB7,
 ///     false,
 ///     Some(0xFFFFFFFF),
@@ -213,7 +213,7 @@ pub fn build_table_32(configuration: &CRCConfiguration<u32>) -> [u32; 256] {
     table
 }
 
-/// Build a CRC table for MSB 32-bit CRCs
+/// Build a CRC table for MSBFirst 32-bit CRCs
 ///
 /// Make use of the fact that `table[i xor j] == table[i] xor table[j]`,
 /// we only have to update entries corresponding to powers of two
@@ -242,7 +242,7 @@ pub fn optimized_build_msb_table_32(configuration: &CRCConfiguration<u32>) -> [u
     table
 }
 
-/// Build a CRC table for LSB 32-bit CRCs
+/// Build a CRC table for LSBFirst 32-bit CRCs
 ///
 /// Make use of the fact that `table[i xor j] == table[i] xor table[j]`,
 /// we only have to update entries corresponding to powers of two
@@ -265,7 +265,7 @@ pub fn optimized_build_lsb_table_32(configuration: &CRCConfiguration<u32>) -> [u
     table
 }
 
-/// Build a CRC table for MSB 16-bit CRCs
+/// Build a CRC table for MSBFirst 16-bit CRCs
 ///
 /// Make use of the fact that `table[i xor j] == table[i] xor table[j]`,
 /// we only have to update entries corresponding to powers of two
@@ -287,7 +287,7 @@ pub fn optimized_build_msb_table_16(configuration: &CRCConfiguration<u16>) -> [u
     table
 }
 
-/// Build a CRC table for LSB 16-bit CRCs
+/// Build a CRC table for LSBFirst 16-bit CRCs
 ///
 /// Make use of the fact that `table[i xor j] == table[i] xor table[j]`,
 /// we only have to update entries corresponding to powers of two
@@ -312,7 +312,7 @@ pub fn optimized_build_lsb_table_16(configuration: &CRCConfiguration<u16>) -> [u
 
 #[cfg(test)]
 mod tests {
-    use crate::crc::{BitWidth, CRCConfiguration, CRCEndianness};
+    use crate::crc::{BitOrder, BitWidth, CRCConfiguration};
 
     use super::{
         build_table_16, build_table_32, optimized_build_lsb_table_16, optimized_build_lsb_table_32,
@@ -325,7 +325,7 @@ mod tests {
     /// let configuration = CRCConfiguration::<u16>::new(
     ///     "CRC-16/CCITT",
     ///     BitWidth::Sixteen,
-    ///     CRCEndianness::MSB,
+    ///     BitOrder::MSBFirst,
     ///     0x1021,
     ///     true,
     ///     None,
@@ -364,7 +364,7 @@ mod tests {
     /// let configuration = CRCConfiguration::<u16>::new(
     ///     "CRC-16/KERMIT",
     ///     BitWidth::Sixteen,
-    ///     CRCEndianness::LSB,
+    ///     BitOrder::LSBFirst,
     ///     0x1021,
     ///     true,
     ///     true,
@@ -404,7 +404,7 @@ mod tests {
     /// let configuration = CRCConfiguration::<u32>::new(
     ///     "CRC-32/MPEG-2",
     ///     BitWidth::ThirtyTwo,
-    ///     CRCEndianness::MSB,
+    ///     BitOrder::MSBFirst,
     ///     0x04C11DB7,
     ///     false,
     ///     Some(0xFFFFFFFF),
@@ -456,7 +456,7 @@ mod tests {
     /// let configuration = CRCConfiguration::<u32>::new(
     ///     "CRC-32/ISO-HDLC",
     ///     BitWidth::ThirtyTwo,
-    ///     CRCEndianness::LSB,
+    ///     BitOrder::LSBFirst,
     ///     0x04C11DB7,
     ///     true,
     ///     true,
@@ -508,7 +508,7 @@ mod tests {
         let configuration = CRCConfiguration::<u32>::new(
             "CRC-32/MPEG-2",
             BitWidth::ThirtyTwo,
-            CRCEndianness::MSB,
+            BitOrder::MSBFirst,
             0x04C11DB7,
             false,
             Some(0xFFFFFFFF),
@@ -526,7 +526,7 @@ mod tests {
         let configuration = CRCConfiguration::<u32>::new(
             "CRC-32/ISO-HDLC",
             BitWidth::ThirtyTwo,
-            CRCEndianness::LSB,
+            BitOrder::LSBFirst,
             0x04C11DB7,
             true,
             Some(0xFFFFFFFF),
@@ -544,7 +544,7 @@ mod tests {
         let configuration = CRCConfiguration::<u16>::new(
             "CRC-16/CCITT",
             BitWidth::Sixteen,
-            CRCEndianness::MSB,
+            BitOrder::MSBFirst,
             0x1021,
             true,
             None,
@@ -561,7 +561,7 @@ mod tests {
         let configuration = CRCConfiguration::<u16>::new(
             "CRC-16/KERMIT",
             BitWidth::Sixteen,
-            CRCEndianness::LSB,
+            BitOrder::LSBFirst,
             0x1021,
             true,
             None,
@@ -578,7 +578,7 @@ mod tests {
         let configuration = CRCConfiguration::<u16>::new(
             "CRC-16/CCITT",
             BitWidth::Sixteen,
-            CRCEndianness::MSB,
+            BitOrder::MSBFirst,
             0x1021,
             true,
             None,
@@ -595,7 +595,7 @@ mod tests {
         let configuration = CRCConfiguration::<u16>::new(
             "CRC-16/KERMIT",
             BitWidth::Sixteen,
-            CRCEndianness::LSB,
+            BitOrder::LSBFirst,
             0x1021,
             true,
             None,
@@ -612,7 +612,7 @@ mod tests {
         let configuration = CRCConfiguration::<u32>::new(
             "CRC-32/MPEG-2",
             BitWidth::ThirtyTwo,
-            CRCEndianness::MSB,
+            BitOrder::MSBFirst,
             0x04C11DB7,
             false,
             Some(0xFFFFFFFF),
@@ -629,7 +629,7 @@ mod tests {
         let configuration = CRCConfiguration::<u32>::new(
             "CRC-32/ISO-HDLC",
             BitWidth::ThirtyTwo,
-            CRCEndianness::LSB,
+            BitOrder::LSBFirst,
             0x04C11DB7,
             true,
             Some(0xFFFFFFFF),

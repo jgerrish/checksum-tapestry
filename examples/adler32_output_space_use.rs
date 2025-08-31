@@ -6,7 +6,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use checksum_tapestry::adler32::Adler32;
-use checksum_tapestry::crc::{BitWidth, CRCConfiguration, CRCEndianness, CRC};
+use checksum_tapestry::crc::{BitOrder, BitWidth, CRCConfiguration, CRC};
 use checksum_tapestry::Checksum;
 
 const NUM_EXPERIMENTS: u32 = 1000;
@@ -92,7 +92,7 @@ fn main() {
         CRCConfiguration::<u32>::new(
             "CRC-32/ISO-HDLC",
             BitWidth::ThirtyTwo,
-            CRCEndianness::LSB,
+            BitOrder::LSBFirst,
             0x04C11DB7,
             true,
             Some(seed),
@@ -114,7 +114,7 @@ fn main() {
         CRCConfiguration::<u32>::new(
             "CRC-32/ISO-HDLC",
             BitWidth::ThirtyTwo,
-            CRCEndianness::LSB,
+            BitOrder::LSBFirst,
             0x04C11DB7,
             true,
             Some(0xFFFFFFFF),
