@@ -1,6 +1,6 @@
 [package]
 name = "checksum-tapestry"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 authors = ["Joshua Gerrish <jgerrish@gmail.com>"]
 description = "Collection of checksum algorithms and examples"

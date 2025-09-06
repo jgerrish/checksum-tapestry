@@ -979,7 +979,6 @@ mod tests {
     /// initial is 0xffffffff, final XOR is 0xffffffff
     #[test]
     fn polynomial_crc_32_iso_hdlc_polynomial_encoding_msbfirst_debug_works() {
-        let _ = env_logger::try_init();
         let poly = Polynomial::<u32> {
             encoding: PolynomialEncoding::MSBFirst,
             width: BitWidth::ThirtyTwo,
